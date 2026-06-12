@@ -3,208 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YesTube - Video Bypass Tool</title>
+    <title>YesTube Prototype</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #121212;
-            color: #ffffff;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        body { 
+            font-family: sans-serif; 
+            background: #111; 
+            color: #fff; 
+            text-align: center; 
+            padding: 20px; 
         }
-
-        .container {
-            width: 100%;
-            max-width: 800px;
-            text-align: center;
+        input, button { 
+            padding: 10px; 
+            font-size: 16px; 
+            margin: 5px; 
+            border-radius: 4px; 
+            border: none; 
         }
-
-        h1 {
-            color: #00bfff;
-            margin-bottom: 5px;
-        }
-
-        .subtitle {
-            color: #aaa;
-            font-size: 14px;
-            margin-bottom: 25px;
-        }
-
-        .search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            justify-content: center;
-        }
-
-        input[type="text"] {
-            width: 70%;
-            padding: 12px;
-            border-radius: 6px;
+        input {
+            background: #222;
+            color: #fff;
             border: 1px solid #333;
-            background-color: #1e1e1e;
-            color: white;
-            font-size: 16px;
         }
-
-        input[type="text"]:focus {
-            outline: 2px solid #00bfff;
+        input:focus {
+            outline: 1px solid #00bfff;
         }
-
-        button {
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            border: none;
-            border-radius: 6px;
-            background-color: #00bfff;
-            color: black;
-            cursor: pointer;
-            transition: background 0.2s;
+        button { 
+            background: #00bfff; 
+            color: white; 
+            cursor: pointer; 
+            font-weight: bold; 
         }
-
         button:hover {
-            background-color: #0099cc;
+            background: #009acd;
         }
-
-        #status {
-            margin: 15px 0;
-            font-size: 14px;
-            color: #ffcc00;
-            font-style: italic;
-            min-height: 20px;
+        .video-container { 
+            margin-top: 20px; 
         }
-
-        .player-section {
-            margin-top: 20px;
-            background: #1e1e1e;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            display: none; /* Hidden until a video loads */
-        }
-
-        video {
-            width: 100%;
-            border-radius: 6px;
-            border: 1px solid #444;
+        video { 
+            width: 100%; 
+            max-width: 720px; 
+            border: 2px solid #00bfff; 
+            border-radius: 8px; 
             background: #000;
         }
-
-        .download-container {
-            margin-top: 15px;
-        }
-
-        .download-btn {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #28a745;
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
-            border-radius: 6px;
-        }
-
-        .download-btn:hover {
-            background-color: #218838;
+        #status { 
+            color: #888; 
+            margin: 10px; 
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
     <h1>📺 YesTube</h1>
-    <div class="subtitle">Bypass restrictions by streaming direct local video files</div>
+    <p>Bypassing standard iframe blocks via direct stream extraction</p>
 
-    <div class="search-box">
-        <input type="text" id="videoUrl" placeholder="Paste YouTube Video URL or ID here...">
-        <button onclick="loadBypassVideo()">Load Video</button>
+    <input type="text" id="videoUrl" placeholder="Paste YouTube Video URL or ID" style="width: 300px;">
+    <button onclick="loadBypassVideo()">Load Video</button>
+
+    <div id="status">Ready. Input a video to stream locally.</div>
+
+    <div class="video-container">
+        <video id="localPlayer" controls autoplay></video>
     </div>
-
-    <div id="status">Ready. Paste a link to break past the block.</div>
-
-    <div class="player-section" id="playerSection">
-        <video id="localPlayer" controls autoplay playsinline></video>
-        <div class="download-container">
-            <a id="downloadBtn" class="download-btn" href="#" target="_blank" download>📥 Download File Directly</a>
-        </div>
-    </div>
-</div>
 
 <script>
-    // Rotator list of backend API servers running Invidious code
+    // A list of active public Invidious API domains to rotate through if one fails
     const invidiousInstances = [
         "https://inv.thepixora.com",
         "https://invidious.f5.si",
         "https://invidious.nerdvpn.de",
-        "https://inv.nadeko.net"
+        "https://inv.nadeko.net",
+        "https://invidious.no-logs.com"
     ];
 
     async function loadBypassVideo() {
         const input = document.getElementById('videoUrl').value.trim();
         const status = document.getElementById('status');
         const player = document.getElementById('localPlayer');
-        const playerSection = document.getElementById('playerSection');
-        const downloadBtn = document.getElementById('downloadBtn');
         
-        // Auto-extract video ID from full YouTube browser links
+        // Extract video ID from input
         let videoId = input;
         if (input.includes('v=')) {
             videoId = input.split('v=')[1].split('&')[0];
         } else if (input.includes('youtu.be/')) {
             videoId = input.split('youtu.be/')[1].split('?')[0];
+        } else if (input.includes('embed/')) {
+            videoId = input.split('embed/')[1].split('?')[0];
         }
 
-        if (!videoId) {
+        if (!videoId || videoId.length < 5) {
             status.style.color = "#ff4444";
-            status.innerText = "Error: Please enter a valid YouTube URL or Video ID.";
+            status.innerText = "Error: Invalid YouTube Video URL or ID";
             return;
         }
 
-        // Hide old layout setup if user tries running a second link
-        playerSection.style.display = "none";
-        player.src = "";
-
-        // Loop through proxy servers to find an unblocked path
+        status.style.color = "#888";
+        
+        // Loop through instances until one successfully answers
         for (let i = 0; i < invidiousInstances.length; i++) {
             const currentDomain = invidiousInstances[i];
-            status.style.color = "#ffcc00";
-            status.innerText = `Bypassing filter... Trying server ${i + 1}/${invidiousInstances.length}...`;
+            status.innerText = `Attempting connection via server ${i + 1}/${invidiousInstances.length}...`;
 
             try {
-                // Fetch direct asset details from proxy API configuration
+                // Fetch video details and raw media stream links asynchronously
                 const response = await fetch(`${currentDomain}/api/v1/videos/${videoId}`);
                 
-                if (!response.ok) throw new Error("Instance rejected request");
+                if (!response.ok) throw new Error("Server response was not OK");
 
                 const data = await response.json();
                 const formatStreams = data.formatStreams;
 
                 if (formatStreams && formatStreams.length > 0) {
-                    // Pull highest priority raw mp4 file address out of array
-                    const rawStreamUrl = formatStreams[0].url; 
-                    
-                    // Attach link endpoints directly to pure HTML targets
-                    player.src = rawStreamUrl; 
-                    downloadBtn.href = rawStreamUrl;
-                    
-                    // Force reveal the local frame block setup
-                    playerSection.style.display = "block";
-                    status.style.color = "#00ffcc";
-                    status.innerText = `Success! Playing: "${data.title}"`;
-                    return; 
+                    // Success! Pass the raw stream URL straight into the HTML5 player source
+                    player.src = formatStreams[0].url; 
+                    status.style.color = "#00bfff";
+                    status.innerText = `Playing: "${data.title}" (via ${currentDomain.replace('https://','')})`;
+                    return; // Break out of the function entirely on success
                 }
             } catch (error) {
-                console.warn(`Server ${currentDomain} was blocked or unresponsive.`);
+                console.warn(`Server ${currentDomain} failed or was blocked. Trying next configuration...`);
             }
         }
 
-        // Catch-all state trigger if loop terminates dry
+        // If the loop completely runs out without hitting 'return'
         status.style.color = "#ff4444";
-        status.innerText = "Bypass Failed: Jamf is blocking all active API nodes, or servers are rate-limited. Try another link later.";
+        status.innerText = "All extraction servers failed. They may be rate-limited by YouTube or restricted by Jamf Network rules.";
     }
 </script>
 
