@@ -64,7 +64,7 @@
     <div id="status">Ready. Input a video to stream locally.</div>
 
     <div class="video-container">
-        <video id="localPlayer" controls autoplay></video>
+        <video id="localPlayer" controls playsinline muted></video>
     </div>
 
 <script>
@@ -106,7 +106,6 @@
             status.innerText = `Attempting connection via server ${i + 1}/${invidiousInstances.length}...`;
 
             try {
-                // Fetch video details and raw media stream links asynchronously
                 const response = await fetch(`${currentDomain}/api/v1/videos/${videoId}`);
                 
                 if (!response.ok) throw new Error("Server response was not OK");
@@ -115,18 +114,28 @@
                 const formatStreams = data.formatStreams;
 
                 if (formatStreams && formatStreams.length > 0) {
-                    // Success! Pass the raw stream URL straight into the HTML5 player source
-                    player.src = formatStreams[0].url; 
+                    // FIXED: Filter out complex adaptive streams and pick standard MP4 video tracks (720p or 360p) that Safari natively recognizes
+                    let compatibleStream = formatStreams.find(stream => stream.container === "mp4" && (stream.quality === "720p" || stream.quality === "360p"));
+                    
+                    // Fallback to first available stream if the standard filters don't hit
+                    if (!compatibleStream) compatibleStream = formatStreams[0];
+
+                    // Assign the stream and force the native iOS element to load it
+                    player.src = compatibleStream.url; 
+                    player.load();
+                    
+                    // Attempt programmatic playback
+                    player.play().catch(e => console.log("Autoplay prevented, user must tap play manually."));
+
                     status.style.color = "#00bfff";
                     status.innerText = `Playing: "${data.title}" (via ${currentDomain.replace('https://','')})`;
-                    return; // Break out of the function entirely on success
+                    return; 
                 }
             } catch (error) {
                 console.warn(`Server ${currentDomain} failed or was blocked. Trying next configuration...`);
             }
         }
 
-        // If the loop completely runs out without hitting 'return'
         status.style.color = "#ff4444";
         status.innerText = "All extraction servers failed. They may be rate-limited by YouTube or restricted by Jamf Network rules.";
     }
